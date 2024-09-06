@@ -1,11 +1,22 @@
-from functools import partial
 from types import GenericAlias
-from typing import Literal, Callable, Dict, Union, Annotated
+from typing import (
+    Literal,
+    Callable,
+    Dict,
+    Union,
+    Annotated,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Header, HTTPException
+from fastapi.routing import APIRoute, get_websocket_app
 from pydantic import BaseModel, TypeAdapter, Field, ValidationError
 from starlette._exception_handler import wrap_app_handling_exceptions
-from starlette.routing import websocket_session
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import websocket_session, WebSocketRoute, Match
 from starlette.types import Scope, Receive, Send
 from starlette.websockets import WebSocket
 
@@ -17,7 +28,7 @@ async def root():
     return {"message": "Hello World"}
 
 
-@app.get("/hello/{name}")
+@app.post("/hello/{name}")
 async def say_hello(name: str):
     return {"message": f"Hello {name}"}
 
@@ -29,24 +40,67 @@ async def websocket(websocket: WebSocket):
     await websocket.close()
 
 
-class WSRouter:
-    _on_connect: Callable
+# class WSRoute(WebSocketRoute):
+class WSRoute(APIRoute):
     _adapter: TypeAdapter
 
-    def __init__(self, discriminator: str):
+    def __init__(
+        self,
+        path: str,
+        discriminator: str,
+        name: Optional[str] = None,
+        dependencies: Sequence[Depends] | None = None,
+        include_in_schema: bool = True,
+        dependency_overrides_provider: Optional[Callable] = None,
+    ):
+        super().__init__(
+            path,
+            self,
+            methods=["POST"],
+            name=name,
+            dependencies=dependencies,
+            dependency_overrides_provider=dependency_overrides_provider,
+            include_in_schema=include_in_schema,
+        )
         self.discriminator = discriminator
         self.mapping: Dict[type, Callable] = {}
-        self._on_connect = None
         self._adapter = None
-        self.__call__ = websocket_session(partial(self.__call, self=self))
+        self.app = websocket_session(
+            get_websocket_app(
+                dependant=self.dependant,
+                dependency_overrides_provider=dependency_overrides_provider,
+                embed_body_fields=self._embed_body_fields,
+            )
+        )
+        # self.__call__ = self.__call__internal__
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+    def matches(self, scope: Scope) -> Tuple[Match, Scope]:
+        return WebSocketRoute.matches(self, scope)
+
+    # def url_path_for(self, name: str, /, **path_params: Any) -> URLPath:
+    #     return WebSocketRoute.url_path_for(self, name, **path_params)
+
+    async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         session = WebSocket(scope, receive=receive, send=send)
 
         async def app(scope: Scope, receive: Receive, send: Send) -> None:
             await self.__call(session)
 
         await wrap_app_handling_exceptions(app, session)(scope, receive, send)
+
+    # This is how we fake the endpoint signature for the api documentation.
+    # The actual communication is being handled in the `handle` method.
+    async def __call__(self): ...
+
+    async def _on_connect(self, websocket: WebSocket) -> None:
+        """Override to handle an incoming websocket connection"""
+        await websocket.accept()
+
+    # async def on_receive(self, websocket: WebSocket, data: typing.Any) -> None:
+    #     """Override to handle an incoming websocket message"""
+    #
+    # async def on_disconnect(self, websocket: WebSocket, close_code: int) -> None:
+    #     """Override to handle a disconnecting websocket"""
 
     def _build_adapter(self) -> TypeAdapter:
         models = GenericAlias(Union, tuple(self.mapping.keys()))
@@ -57,9 +111,7 @@ class WSRouter:
         if not self._adapter:
             self._adapter = self._build_adapter()
 
-        if self._on_connect:
-            await self._on_connect(websocket)
-        await websocket.accept()
+        await self._on_connect(websocket)
 
         message = await websocket.receive_text()
         try:
@@ -91,25 +143,42 @@ class WSRouter:
 
 
 class UserMessage(BaseModel):
-    message_type: Literal['user']
+    message_type: Literal["user"]
     user_id: int
     user_name: str
 
 
 class PostMessage(BaseModel):
-    message_type: Literal['post']
+    message_type: Literal["post"]
     post_id: int
     post_content: str
 
 
-router = WSRouter(discriminator="message_type")
-app.add_websocket_route("/ws2", router)
+async def headerauth(x_token: Optional[str] = Header(None)):
+    if x_token == "fail":
+        raise HTTPException(status_code=400, detail="X-Token header invalid")
+
+
+router = WSRoute(
+    "/ws2",
+    discriminator="message_type",
+    dependencies=[Depends(headerauth)],
+)
+app.routes.append(router)
+
+
+async def app2(req: Request) -> Response: ...
+
+
+app.add_api_route("/static", app2, methods=["POST"], name="static")
 
 
 @router.on_connect
 async def on_connect(websocket: WebSocket):
-    if 'Fail' in websocket.scope['subprotocols']:
+    if "Fail" in websocket.scope["subprotocols"]:
         await websocket.close()
+    else:
+        await websocket.accept()
 
 
 @router.fallback
