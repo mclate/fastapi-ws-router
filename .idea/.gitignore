@@ -6,13 +6,3 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
-
-
-venv
-postman
-node_modules
-__pycache__
-.*
-!.gitignore
-!.github
-!.env
