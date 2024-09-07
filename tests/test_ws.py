@@ -195,14 +195,23 @@ def test_client_disconnect(router: WSRouter, ws: WebSocketFixture):
 def test_custom_dispatcher(app: FastAPI, ws: WebSocketFixture):
     called = False
 
+    class Message(BaseModel):
+        ...
+
+    async def handler(message: Message, websocket: WebSocket):
+        assert False  # Will not be called because dispatcher didn't dispatch
+
     async def dispatcher(websocket: WebSocket, mapping: dict, message: str):
         nonlocal called
+        assert mapping == {Message: handler}
+        assert message == '{"a":"1234"}'
         called = True
 
     router = WSRouter(dispatcher=dispatcher)
+    router.receive(Message)(handler)
     app.include_router(router, prefix="/ws")
 
     with ws() as websocket:
-        websocket.send_text("")
+        websocket.send_json({"a":"1234"})
 
     assert called
