@@ -1,111 +1,27 @@
 from enum import Enum
 from types import GenericAlias
 from typing import (
-    Literal,
     Callable,
+    Optional,
+    Sequence,
+    List,
+)
+from typing import (
     Dict,
     Union,
     Annotated,
-    Optional,
-    Sequence,
-    Tuple,
-    List,
     Any,
     Type,
 )
+
+from fastapi import params
+from fastapi.routing import APIRouter
+from pydantic import BaseModel, TypeAdapter, Field, ValidationError
+from starlette.types import Lifespan
+from starlette.websockets import WebSocket, WebSocketDisconnect
 from typing_extensions import Doc
 
-from fastapi import FastAPI, Depends, Header, HTTPException, params
-from fastapi.routing import APIRoute, get_websocket_app, APIRouter
-from pydantic import BaseModel, TypeAdapter, Field, ValidationError
-from starlette._exception_handler import wrap_app_handling_exceptions
-from starlette.routing import websocket_session, WebSocketRoute, Match
-from starlette.types import Scope, Receive, Send, Lifespan
-from starlette.websockets import WebSocket
-
-app = FastAPI()
-
-
-class UserMessage(BaseModel):
-    message_type: Literal["user"]
-    user_id: int
-    user_name: str
-
-
-class PostMessage(BaseModel):
-    message_type: Literal["post"]
-    post_id: int
-    post_content: str
-
-
-@app.get("/", response_model=Union[UserMessage, PostMessage])
-async def root():
-    return {"message": "Hello World"}
-
-
-@app.post("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
-
-
-@app.websocket("/ws")
-async def websocket(websocket: WebSocket):
-    await websocket.accept()
-    await websocket.send_json({"msg": "Hello WebSocket"})
-    await websocket.close()
-
-
-class WSMainRoute(APIRoute):
-    _adapter: TypeAdapter
-
-    def __init__(
-        self,
-        path: str,
-        endpoint: Callable,
-        name: Optional[str] = None,
-        dependencies: Sequence[Depends] | None = None,
-        include_in_schema: bool = True,
-        dependency_overrides_provider: Optional[Callable] = None,
-        response_model: type = None,
-        tags: List[str] = None,
-        **kwargs,
-    ):
-        super().__init__(
-            path,
-            endpoint=endpoint,
-            name=name,
-            dependencies=dependencies,
-            dependency_overrides_provider=dependency_overrides_provider,
-            response_model=response_model,
-            include_in_schema=include_in_schema,
-            tags=tags,
-            **kwargs,
-        )
-        self.app = websocket_session(
-            get_websocket_app(
-                dependant=self.dependant,
-                dependency_overrides_provider=dependency_overrides_provider,
-                embed_body_fields=self._embed_body_fields,
-            )
-        )
-
-    def matches(self, scope: Scope) -> Tuple[Match, Scope]:
-        return WebSocketRoute.matches(self, scope)
-
-    async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
-        session = WebSocket(scope, receive=receive, send=send)
-
-        async def app(scope: Scope, receive: Receive, send: Send) -> None:
-            await self.endpoint(session)
-
-        await wrap_app_handling_exceptions(app, session)(scope, receive, send)
-
-
-class WSRoute(APIRoute):
-    """This is a "mocked" route that never matches. It's there only for the documentation"""
-
-    def matches(self, scope: Scope) -> Tuple[Match, Scope]:
-        return Match.NONE, {}
+from .route import WSRoute, WSMainRoute
 
 
 class WSRouter(APIRouter):
@@ -259,7 +175,9 @@ class WSRouter(APIRouter):
             # WSRoute(endpoint=self.prefix, discriminator=discriminator),
         )
 
-    def _build_adapter(self) -> TypeAdapter:
+    def _build_adapter(self) -> Optional[TypeAdapter]:
+        if not self.mapping:
+            return None
         models = GenericAlias(Union, tuple(self.mapping.keys()))
         AnnotatedModels = Annotated[models, Field(discriminator=self.discriminator)]
         return TypeAdapter(AnnotatedModels)
@@ -272,11 +190,20 @@ class WSRouter(APIRouter):
 
         try:
             message = await websocket.receive_text()
+        except WebSocketDisconnect as err:
+            await self._on_disconnect(websocket, err)
+            return
         except KeyError:  # didn't receive text
-            await self._fallback_bytes(websocket)
+            await self._on_bytes(websocket)
+            return
+        except RuntimeError as err:
+            await self._fallback(websocket, None, err)
             return
 
         try:
+            if not self._adapter:
+                await self._fallback(websocket, message, None)
+                return
             validated = self._adapter.validate_json(message)
         except ValidationError as e:
             await self._fallback(websocket, message, e)
@@ -285,7 +212,15 @@ class WSRouter(APIRouter):
         handler = self.mapping[validated.__class__]
         await handler(validated, websocket)
 
-        await websocket.close()
+    async def _on_disconnect(
+        self, websocket: WebSocket, err: WebSocketDisconnect
+    ) -> None:
+        """Override to handle client disconnect"""
+        pass
+
+    def on_disconnect(self, func):
+        self._on_disconnect = func
+        return func
 
     async def _on_connect(self, websocket: WebSocket) -> None:
         """Override to handle an incoming websocket connection"""
@@ -314,59 +249,23 @@ class WSRouter(APIRouter):
 
         return decorator
 
-    def fallback_bytes(self, func):
-        """Handler to be called when the received message is not a text (but bytes). Will call `fallback` by default."""
-        self._fallback_bytes = func
-        return func
+    async def _fallback(
+        self,
+        websocket: WebSocket,
+        message: str,
+        error: ValidationError,
+    ):
+        """Handler to be called when the received message is not a valid model."""
+        pass
 
     def fallback(self, func):
         self._fallback = func
         return func
 
-    async def _fallback_bytes(self, websocket: WebSocket):
-        await self._fallback(websocket, None, KeyError("No text received"))
+    def on_bytes(self, func):
+        """Handler to be called when the received message is not a text (but bytes). Will call `fallback` by default."""
+        self._on_bytes = func
+        return func
 
-
-async def headerauth(x_token: Optional[str] = Header(None)):
-    if x_token == "fail":
-        raise HTTPException(status_code=400, detail="X-Token header invalid")
-
-
-router = WSRouter(
-    # discriminator="message_type",
-    dependencies=[Depends(headerauth)],
-    tags=["WS"],
-    name="Websocket entrypoint",
-    callbacks=Union[UserMessage, PostMessage],
-)
-
-
-@router.on_connect
-async def on_connect(websocket: WebSocket):
-    if "Fail" in websocket.scope["subprotocols"]:
-        await websocket.close()
-    else:
-        await websocket.accept()
-
-
-@router.fallback
-async def fallback(websocket: WebSocket, message: str, error: ValidationError):
-    await websocket.send_text("Invalid message type")
-
-
-@router.fallback_bytes
-async def fallback_bytes(websocket: WebSocket):
-    await websocket.send_text("Bytes fallback")
-
-
-@router.receive(UserMessage)
-async def get_user_message(message: UserMessage, websocket: WebSocket):
-    await websocket.send_json({"model": "UserMessage"})
-
-
-@router.receive(PostMessage, callbacks=Union[UserMessage, PostMessage])
-async def get_post_message(message: PostMessage, websocket: WebSocket):
-    await websocket.send_json({"model": "PostMessage"})
-
-
-app.include_router(router, prefix="/ws2")
+    async def _on_bytes(self, websocket: WebSocket):
+        pass
