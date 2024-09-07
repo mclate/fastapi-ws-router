@@ -35,12 +35,17 @@ def test_on_connect(client: TestClient):
 
 
 def test_fallback(client: TestClient):
-    # res = client.post("/ws2")
-    # assert res.status_code == 200, res.content
     with client.websocket_connect("/ws2") as websocket:
         websocket.send_json({"message_type": "invalid"})
         data = websocket.receive_text()
         assert data == "Invalid message type"
+
+
+def test_fallback_bytes(client: TestClient):
+    with client.websocket_connect("/ws2") as websocket:
+        websocket.send_bytes(b"something")
+        data = websocket.receive_text()
+        assert data == "Bytes fallback"
 
 
 def test_openapi(client: TestClient):
@@ -53,3 +58,8 @@ def test_fail_header(client: TestClient):
     with pytest.raises(starlette.websockets.WebSocketDisconnect):
         with client.websocket_connect("/ws2", headers={"X-Token": "fail"}):
             ...
+
+
+def test_incorrect_route(client: TestClient):
+    res = client.post("/ws2 (get_user_message)")
+    assert res.status_code == 404
