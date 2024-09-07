@@ -5,6 +5,7 @@ from typing import (
     Optional,
     Sequence,
     List,
+    Awaitable,
 )
 from typing import (
     Dict,
@@ -137,6 +138,7 @@ class WSRouter(APIRouter):
         ] = True,
         name: str = None,
         callbacks: Any = None,
+        dispatcher: Callable[[WebSocket, Dict[type, Callable], str], Awaitable[None]] = None,
     ) -> None:
         super().__init__(
             on_startup=on_startup,
@@ -152,6 +154,7 @@ class WSRouter(APIRouter):
         )
         self._adapter = None
         self.discriminator = discriminator
+        self.dispatcher = dispatcher or self._dispatcher
         self.mapping: Dict[type, Callable] = {}
         # self.add_api_route(
         #     path="",
@@ -200,6 +203,14 @@ class WSRouter(APIRouter):
             await self._fallback(websocket, None, err)
             return
 
+        await self.dispatcher(websocket, self.mapping, message)
+
+    async def _dispatcher(
+        self,
+        websocket: WebSocket,
+        mapping: Dict[type, Callable],
+        message: str,
+    ):
         try:
             if not self._adapter:
                 await self._fallback(websocket, message, None)
