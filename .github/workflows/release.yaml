@@ -4,10 +4,20 @@ on:
   push:
     branches: [ ci ]
 
+
+permissions:
+  contents: read
+  id-token: write
+
+
 jobs:
   run:
     name: "Build & Release"
     runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/fastapi-ws-router
 
     steps:
     - uses: actions/checkout@v3
@@ -29,5 +39,5 @@ jobs:
     - name: Build
       run: hatch build
 
-    - name: Publish
-      run: hatch publish -n
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
