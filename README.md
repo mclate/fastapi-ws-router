@@ -4,7 +4,8 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fastapi-ws-router.svg)](https://pypi.org/project/fastapi-ws-router)
 
 -----
-Small library to allow documenting WebSocket endpoints in FastAPI.
+
+Small library that allows one to document WebSocket messages in FastAPI.
 
 ## Overview
 
@@ -42,7 +43,7 @@ pip install fastapi-ws-router
 Then you can use it in your FastAPI application:
 
 ```python
-from typing import Literal
+from typing import Literal, Union
 
 from fastapi import FastAPI
 from fastapi_ws_router import WSRouter
@@ -67,7 +68,7 @@ router = WSRouter(discriminator="action")  # Discriminator is optional
 
 
 # Handlers for specific messages
-@router.receive(ChatMessage)
+@router.receive(ChatMessage, callbacks=Union[ChatMessage, ChatActivity])
 async def on_chat_message(websocket, data: ChatMessage):
     await websocket.send_text(f"Got message: {data.message}")
 
@@ -81,6 +82,8 @@ async def on_chat_activity(websocket, data: ChatActivity):
 app.include_router(router, prefix="/ws")
 
 ```
+
+![OpenAPI example](https://github.com/mclate/fastapi-ws-router/blob/main/example.png)
 
 In the example we use `action` field as a discriminator, although the message structure is completely up to
 you. `discriminator` property is optional, it will help PyDantic to perform some optimizations
