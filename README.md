@@ -36,7 +36,7 @@ In other words, you still have to take care of all the WebSocket operations you 
 Installation as usual:
 
 ```bash
-pip install fastapi-websocket-router
+pip install fastapi-ws-router
 ```
 
 Then you can use it in your FastAPI application:
