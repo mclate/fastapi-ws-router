@@ -154,14 +154,7 @@ class WSRouter(APIRouter):
         self.dispatcher = dispatcher or self._dispatcher
         self.mapping: Dict[type, Callable] = {}
         self.as_text = as_text
-        # self.add_api_route(
-        #     path="",
-        #     route_class_override=WSRoute,
-        #     endpoint=WSRoute(
-        #         path=self.prefix, endpoint=None, discriminator=discriminator
-        #     ),
-        #     methods=["POST"],
-        # )
+
         self.routes.append(
             WSMainRoute(
                 path="",
@@ -173,7 +166,6 @@ class WSRouter(APIRouter):
                 tags=tags,
                 response_model=callbacks,
             ),
-            # WSRoute(endpoint=self.prefix, discriminator=discriminator),
         )
 
     def _build_adapter(self) -> Optional[TypeAdapter]:
