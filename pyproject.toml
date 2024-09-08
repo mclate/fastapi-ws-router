@@ -53,6 +53,9 @@ python = ["3.12", "3.11", "3.10", "3.9"]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/fastapi_ws_router tests}"
 
+[[tool.hatch.envs.types.matrix]]
+python = ["3.12", "3.11", "3.10", "3.9"]
+
 [tool.coverage.run]
 source_pkgs = ["fastapi_ws_router", "tests"]
 branch = true
