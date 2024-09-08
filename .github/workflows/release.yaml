@@ -2,7 +2,7 @@ name: "CI"
 
 on:
   push:
-    branches: [ main ]
+    branches: [ ci ]
 
 jobs:
   run:
@@ -30,4 +30,4 @@ jobs:
       run: hatch build
 
     - name: Publish
-      run: hatch publish
+      run: hatch publish -n
