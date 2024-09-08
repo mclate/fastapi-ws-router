@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel, ValidationError
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from conftest import WebSocketFixture
+from .conftest import WebSocketFixture
 from fastapi_ws_router import WSRouter
 
 

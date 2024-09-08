@@ -1,3 +1,4 @@
+import sys
 from enum import Enum
 from types import GenericAlias
 from typing import (
@@ -183,9 +184,16 @@ class WSRouter(APIRouter):
     def _build_adapter(self) -> Optional[TypeAdapter]:
         if not self.mapping:
             return None
-        models = GenericAlias(Union, tuple(self.mapping.keys()))
-        AnnotatedModels = Annotated[models, Field(discriminator=self.discriminator)]
-        return TypeAdapter(AnnotatedModels)
+        if len(self.mapping) == 1:
+            models = list(self.mapping.keys())[0]
+        else:
+            models = GenericAlias(Union, tuple(self.mapping.keys()))
+
+        if sys.version_info[1] > 10:
+            AnnotatedModels = Annotated[models, Field(discriminator=self.discriminator)]
+            return TypeAdapter(AnnotatedModels)
+        else:
+            return TypeAdapter(models)
 
     async def handler(self, websocket: WebSocket):
         if not self._adapter:

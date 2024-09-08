@@ -1,5 +1,9 @@
 # FastAPI WebSocker router
 
+[![PyPI - Version](https://img.shields.io/pypi/v/fastapi-ws-router.svg)](https://pypi.org/project/fastapi-ws-router)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/fastapi-ws-router.svg)](https://pypi.org/project/fastapi-ws-router)
+
+-----
 Small library to allow documenting WebSocket endpoints in FastAPI.
 
 ## Overview
@@ -178,11 +182,14 @@ These endpoints will have "weird" path (router prefix + handler name) - this pro
 documentation. Such routes, when attempted to be accessed directly, say, through the Swagegr UI, will never be found, as
 they are not a real routes. (In reality, they are, they just "tweaked" to never match any path given)
 
-It is possible to override path of each handler by providing `path` parameter in the `receive` decorator. It will be appended to the router prefix. This path can be anything - handler routes are guaranteed to never match and requested path. This is only for documentation purpose.
+It is possible to override path of each handler by providing `path` parameter in the `receive` decorator. It will be
+appended to the router prefix. This path can be anything - handler routes are guaranteed to never match and requested
+path. This is only for documentation purpose.
 
 ```python
 router = WSRouter()
 app.include_router(router, prefix="/ws")
+
 
 @router.receive(ChatMessage, path=": WS Chat message")  # Result in `/ws: WS Chat message` path in the documentation
 async def on_chat_message(websocket, data: ChatMessage):
@@ -227,8 +234,9 @@ async def on_disconnect(websocket: WebSocket, message: WebSocketDisconnect):
 ### `on_fallback`
 
 Emitted when we are unable to cast message to any of the known PyDantic models or there is a violation of the WebSocket
-protocol. You will receive the original error in the third parameter of the handler. `message` will always be either a
-string or bytes (based on what protocol you define in the `WSRouter`)
+protocol. Message will be `None` in case of protocol violation. You will receive the original error in the third
+parameter of the handler. `message` will always be either a string or bytes (based on what protocol you define in
+the `WSRouter`)
 
 In case of validation error, you will receive original PyDantic `ValidationError` as a third parameter.
 
@@ -280,3 +288,7 @@ By default, router assumes that messages are strings and use `websocket.receive_
 It is possible to switch to bytes mode by providing `as_text=False` to the `WSRouter` constructor.
 In this case `websocket.receive_bytes()` will be used instead.
 In default dispatcher, received bytes will be sent to the PyDantic `TypeAdapter.validate_json` method.
+
+## License
+
+`fastapi-ws-router` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.

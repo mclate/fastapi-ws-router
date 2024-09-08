@@ -20,7 +20,7 @@ class WSMainRoute(APIRoute):
         path: str,
         endpoint: Callable,
         name: Optional[str] = None,
-        dependencies: Sequence[Depends] | None = None,
+        dependencies: Optional[Sequence[Depends]] = None,
         include_in_schema: bool = True,
         dependency_overrides_provider: Optional[Callable] = None,
         response_model: type = None,
@@ -42,7 +42,6 @@ class WSMainRoute(APIRoute):
             get_websocket_app(
                 dependant=self.dependant,
                 dependency_overrides_provider=dependency_overrides_provider,
-                embed_body_fields=self._embed_body_fields,
             )
         )
 
