@@ -202,3 +202,18 @@ def test_custom_dispatcher(app: FastAPI, ws: WebSocketFixture):
         websocket.send_json({"a": "1234"})
 
     assert called
+
+
+def test_multiple_messages(router: WSRouter, ws: WebSocketFixture):
+    messages = 0
+
+    @router.receive(UserMessage)
+    async def handler1(websocket: WebSocket, message: UserMessage):  # noqa: RUF029
+        nonlocal messages
+        messages += 1
+
+    with ws() as websocket:
+        websocket.send_json({"message_type": "user", "user_id": 1, "user_name": "John"})
+        websocket.send_json({"message_type": "user", "user_id": 1, "user_name": "John"})
+        websocket.send_json({"message_type": "user", "user_id": 1, "user_name": "John"})
+    assert messages == 3
