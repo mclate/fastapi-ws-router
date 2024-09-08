@@ -212,20 +212,21 @@ class WSRouter(APIRouter):
 
         await self._on_connect(websocket)
 
-        try:
-            message: Union[str, bytes]
-            if self.as_text:
-                message = await websocket.receive_text()
-            else:
-                message = await websocket.receive_bytes()
-        except WebSocketDisconnect as err:
-            await self._on_disconnect(websocket, err.code, err.reason)
-            return
-        except RuntimeError as err:
-            await self._fallback(websocket, None, err)
-            return
+        while True:
+            try:
+                message: Union[str, bytes]
+                if self.as_text:
+                    message = await websocket.receive_text()
+                else:
+                    message = await websocket.receive_bytes()
+            except WebSocketDisconnect as err:
+                await self._on_disconnect(websocket, err.code, err.reason)
+                return
+            except RuntimeError as err:
+                await self._fallback(websocket, None, err)
+                return
 
-        await self.dispatcher(websocket, self.mapping, message)
+            await self.dispatcher(websocket, self.mapping, message)
 
     async def _dispatcher(
         self,
