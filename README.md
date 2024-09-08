@@ -45,7 +45,7 @@ Then you can use it in your FastAPI application:
 from typing import Literal
 
 from fastapi import FastAPI
-from fastapi_websocket_router import WSRouter
+from fastapi_ws_router import WSRouter
 from pydantic import BaseModel
 
 
@@ -114,8 +114,7 @@ async def on_event1(websocket, data: Event1):
 ```
 
 ⚠️ Notice that those callbacks are informational only and pose no effect or restriction on the actual communication.
-Server doesn't
-have to comply with them at all. They are there only for the documentation.
+Server doesn't have to comply with them at all. They are there only for the documentation.
 
 Callbacks defined in the router will be shown in the entrypoint route. This is to indicate that "once connected, client
 can expect to receive these messages"
@@ -134,18 +133,18 @@ This is the only thing we are somewhat opinionated about: event handler will alw
 PyDantic model built from the received ws message (one message - one model instance).
 
 Notice, that this doesn't apply to the messages emitted by the server. The library helps document them based on PyDantic
-models,
-but it doesn't interfere with the actual communication in any way.
+models, but it doesn't interfere with the actual communication in any way.
 
 Event handler should always have next signature: `async def handler(WebSocket, BaseModel)`  (first argument is always
 a `WebSocket` instance and the second one is a PyDantic model instance)
+
+Not-async handlers are not supported.
 
 ### Dependency injection
 
 Due to the nature of WebSockets, only the entrypoint route (defined by the `WSRouter` itself) is able to apply
 dependency injection. In other words, it is not possible to use any dependencies or `Path/Query/Header/Body` parameters
-in
-the event handlers.
+in the event handlers.
 
 There is a way to pass down the data from the entrypoint to the handlers using the underlying `websocket.scope` object.
 Below is an example of how one can pass the path parameter to the event handler:
@@ -205,7 +204,7 @@ We also do not support any status codes or response headers.
 
 ## Connection handlers
 
-Connection handers are exposed as decorators similar to the event handlers.
+Connection handlers are exposed as decorators similar to the event handlers.
 
 ### `on_connect`
 
@@ -243,7 +242,7 @@ In case of validation error, you will receive original PyDantic `ValidationError
 ```python
 
 @router.on_fallback
-async def on_fallback(websocket: WebSocket, message: Optional[Union[str, bytes]], err: Exception):
+async def on_fallback(websocket: WebSocket, message: Optional[Union[str, bytes]], err: Optional[Exception]):
     ...
 
 ```

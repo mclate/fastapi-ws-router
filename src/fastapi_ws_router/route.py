@@ -17,6 +17,13 @@ from starlette.websockets import WebSocket
 
 
 class WSMainRoute(APIRoute):
+    """
+    Websocket entrypoint. This is the route that the client will be using to connect to the websocket endpoint.
+
+    It is based on the regular HTTP api route (so that FastAPI would include it in the openapi),
+    but it behaves as websocket route.
+    """
+
     def __init__(
         self,
         path: str,
