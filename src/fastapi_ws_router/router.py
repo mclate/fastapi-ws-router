@@ -132,10 +132,34 @@ class WSRouter(APIRouter):
                 """
             ),
         ] = True,
-        name: Optional[str] = None,
-        callbacks: Optional[type] = None,
-        dispatcher: Optional[Callable[[WebSocket, Dict[type, Callable], Union[str, bytes]], Awaitable[None]]] = None,
-        as_text: bool = True,
+        name: Annotated[Optional[str], Doc("""Endpoint name that will be placed in the api documentation""")] = None,
+        callbacks: Annotated[
+            Optional[type],
+            Doc(
+                """
+                Model (or union) that the client can expect during WS communication. 
+                Will populate the OpenAPI response model for the main ws route.
+                
+                In order to return more than one model use `Union[Model1, Model2]`.
+                """
+            ),
+        ] = None,
+        dispatcher: Annotated[
+            Optional[Callable[[WebSocket, Dict[type, Callable], Union[str, bytes]], Awaitable[None]]],
+            Doc(
+                """
+                Custom dispatcher to handle incoming messages.
+                
+                Second argument is a mapping of the models registered through `receive` decorator to their handlers.
+                
+                Third argument is the original message received from the client.
+                """
+            ),
+        ] = None,
+        as_text: Annotated[
+            bool,
+            Doc("Whether the communication is expected to be in text (default) or bytes format"),
+        ] = True,
     ) -> None:
         super().__init__(
             on_startup=on_startup,
