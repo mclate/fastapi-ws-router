@@ -42,6 +42,7 @@ extra-dependencies = [
 ]
 
 [tool.hatch.envs.hatch-test]
+# parallel = true  # it's faster to run consequently due to a small number of tests
 extra-dependencies = [
   "httpx"
 ]
@@ -77,4 +78,12 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-line_length = 120
+line-length = 120
+
+[tool.ruff.lint]
+preview = true
+extend-ignore = ["UP", "FA100"]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/*" = ["ARG001", "UP"]
+"example.py" = ["ARG001"]

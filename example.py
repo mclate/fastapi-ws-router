@@ -1,6 +1,6 @@
-from typing import Literal, List, Union, Dict
+from typing import Dict, List, Literal, Union
 
-from fastapi import FastAPI, Depends, Path
+from fastapi import Depends, FastAPI, Path
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.websockets import WebSocket
@@ -76,7 +76,7 @@ class UserMessageEvent(BaseModel):
     message: str
 
 
-async def room_id_depends(
+def room_id_depends(
     request: Request,
     room_id: str = Path(..., description="ID of the room to join"),
 ):
@@ -95,7 +95,7 @@ router = WSRouter(
 
 async def broadcast(room_id: str, event: BaseModel):
     """Broadcasts the event to all users in the room"""
-    pass  # This is for the client to implement
+    # This is for the client to implement
 
 
 @router.on_connect
@@ -103,9 +103,7 @@ async def connect(websocket: WebSocket):
     room_id = websocket.scope["room_id"]
     if room_id == "1":
         await websocket.accept()
-        await websocket.send_json(
-            RoomDetailsEvent(action="server_room_details", room_name="Room 1")
-        )
+        await websocket.send_json(RoomDetailsEvent(action="server_room_details", room_name="Room 1"))
     else:
         await websocket.close()
 

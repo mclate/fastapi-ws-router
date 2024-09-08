@@ -1,38 +1,33 @@
 import sys
+from collections.abc import Awaitable, Sequence
 from enum import Enum
 from types import GenericAlias
 from typing import (
-    Callable,
-    Optional,
-    Sequence,
-    List,
-    Awaitable,
-)
-from typing import (
-    Dict,
-    Union,
     Annotated,
     Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
     Type,
+    Union,
 )
 
 from fastapi import params
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, TypeAdapter, Field, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from starlette.types import Lifespan
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from typing_extensions import Doc
 
-from .route import WSRoute, WSMainRoute
+from fastapi_ws_router.route import WSMainRoute, WSRoute
 
 
 class WSRouter(APIRouter):
     def __init__(
         self,
         *,
-        discriminator: Annotated[
-            Optional[str], Doc("The field name to use as a discriminator.")
-        ] = None,
+        discriminator: Annotated[Optional[str], Doc("The field name to use as a discriminator.")] = None,
         prefix: Annotated[str, Doc("An optional path prefix for the router.")] = "",
         tags: Annotated[
             Optional[List[Union[str, Enum]]],
@@ -184,16 +179,16 @@ class WSRouter(APIRouter):
     def _build_adapter(self) -> Optional[TypeAdapter]:
         if not self.mapping:
             return None
+
         if len(self.mapping) == 1:
-            models = list(self.mapping.keys())[0]
+            models = next(iter(self.mapping.keys()))
         else:
             models = GenericAlias(Union, tuple(self.mapping.keys()))  # type: ignore[assignment, arg-type]
 
-        if sys.version_info[1] > 10:
-            AnnotatedModels = Annotated[models, Field(discriminator=self.discriminator)]  # type: ignore[valid-type]
-            return TypeAdapter(AnnotatedModels)
-        else:
-            return TypeAdapter(models)
+        if sys.version_info >= (3, 11):
+            annotated_models = Annotated[models, Field(discriminator=self.discriminator)]  # type: ignore[valid-type]
+            return TypeAdapter(annotated_models)
+        return TypeAdapter(models)
 
     async def handler(self, websocket: WebSocket):
         if not self._adapter:
@@ -236,13 +231,12 @@ class WSRouter(APIRouter):
 
     async def _on_disconnect(self, websocket: WebSocket, code: int, message: Optional[str]) -> None:
         """Override to handle client disconnect"""
-        pass
 
     def on_disconnect(self, func):
         self._on_disconnect = func
         return func
 
-    async def _on_connect(self, websocket: WebSocket) -> None:
+    async def _on_connect(self, websocket: WebSocket) -> None:  # noqa: PLR6301
         """Override to handle an incoming websocket connection"""
         await websocket.accept()
 
@@ -252,11 +246,11 @@ class WSRouter(APIRouter):
 
     def receive(
         self,
-                model: Type[BaseModel],
-                /,
-                callbacks: Optional[Union[Type[BaseModel], type]] = None,
-                path: Optional[str] = None,
-                ):
+        model: Type[BaseModel],
+        /,
+        callbacks: Optional[Union[Type[BaseModel], type]] = None,
+        path: Optional[str] = None,
+    ):
         def decorator(func):
             self.mapping[model] = func
             self.routes.append(
@@ -282,7 +276,6 @@ class WSRouter(APIRouter):
         error: Optional[Exception],
     ):
         """Handler to be called when the received message is not a valid model."""
-        pass
 
     def fallback(self, func):
         self._fallback = func

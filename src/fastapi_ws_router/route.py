@@ -1,17 +1,18 @@
+from collections.abc import Sequence
 from enum import Enum
 from typing import (
     Callable,
+    List,
     Optional,
-    Sequence,
     Tuple,
-    List, Union,
+    Union,
 )
 
 from fastapi import Depends
 from fastapi.routing import APIRoute, get_websocket_app
-from starlette._exception_handler import wrap_app_handling_exceptions
-from starlette.routing import WebSocketRoute, Match, websocket_session
-from starlette.types import Scope, Receive, Send
+from starlette._exception_handler import wrap_app_handling_exceptions  # noqa: PLC2701
+from starlette.routing import Match, WebSocketRoute, websocket_session
+from starlette.types import Receive, Scope, Send
 from starlette.websockets import WebSocket
 
 
@@ -22,7 +23,7 @@ class WSMainRoute(APIRoute):
         endpoint: Callable,
         name: Optional[str] = None,
         dependencies: Optional[Sequence[Depends]] = None,  # type: ignore[valid-type]
-        include_in_schema: bool = True,
+        include_in_schema: bool = True,  # noqa: FBT001 FBT002
         dependency_overrides_provider: Optional[Callable] = None,
         response_model: Optional[type] = None,
         tags: Optional[List[Union[str, Enum]]] = None,
@@ -57,5 +58,5 @@ class WSMainRoute(APIRoute):
 class WSRoute(APIRoute):
     """This is a "mocked" route that never matches. It's there only for the documentation"""
 
-    def matches(self, scope: Scope) -> Tuple[Match, Scope]:
+    def matches(self, _: Scope) -> Tuple[Match, Scope]:  # noqa: PLR6301
         return Match.NONE, {}
