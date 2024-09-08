@@ -1,4 +1,4 @@
-from typing import Literal, Union, Optional
+from typing import Literal, Union, Optional, Callable, Dict
 
 import pytest
 from fastapi import FastAPI, Depends, Header, Path
@@ -37,7 +37,7 @@ def test_app(router: WSRouter, ws: WebSocketFixture, model: str, body: dict):
     async def get_user_message(websocket: WebSocket, message: UserMessage):
         await websocket.send_json({"model": "UserMessage"})
 
-    @router.receive(PostMessage, callbacks=Union[UserMessage, PostMessage])
+    @router.receive(PostMessage, callbacks=Union[UserMessage, PostMessage])  # type: ignore[arg-type]
     async def get_post_message(websocket: WebSocket, message: PostMessage):
         await websocket.send_json({"model": "PostMessage"})
 
@@ -191,7 +191,7 @@ def test_custom_dispatcher(app: FastAPI, ws: WebSocketFixture):
     async def handler(message: Message, websocket: WebSocket):
         assert False  # Will not be called because dispatcher didn't dispatch
 
-    async def dispatcher(websocket: WebSocket, mapping: dict, message: str):
+    async def dispatcher(websocket: WebSocket, mapping: Dict[type, Callable[..., None]], message: Union[str, bytes]):
         nonlocal called
         assert mapping == {Message: handler}
         assert message == '{"a":"1234"}'

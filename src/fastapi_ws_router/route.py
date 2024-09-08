@@ -1,9 +1,10 @@
+from enum import Enum
 from typing import (
     Callable,
     Optional,
     Sequence,
     Tuple,
-    List,
+    List, Union,
 )
 
 from fastapi import Depends
@@ -20,11 +21,11 @@ class WSMainRoute(APIRoute):
         path: str,
         endpoint: Callable,
         name: Optional[str] = None,
-        dependencies: Optional[Sequence[Depends]] = None,
+        dependencies: Optional[Sequence[Depends]] = None,  # type: ignore[valid-type]
         include_in_schema: bool = True,
         dependency_overrides_provider: Optional[Callable] = None,
-        response_model: type = None,
-        tags: List[str] = None,
+        response_model: Optional[type] = None,
+        tags: Optional[List[Union[str, Enum]]] = None,
         **kwargs,
     ):
         super().__init__(
@@ -46,7 +47,7 @@ class WSMainRoute(APIRoute):
         )
 
     def matches(self, scope: Scope) -> Tuple[Match, Scope]:
-        return WebSocketRoute.matches(self, scope)
+        return WebSocketRoute.matches(self, scope)  # type: ignore[arg-type]
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         session = WebSocket(scope, receive=receive, send=send)

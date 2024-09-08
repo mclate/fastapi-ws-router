@@ -1,9 +1,10 @@
 from contextlib import contextmanager
-from typing import Callable, ContextManager, List, Dict
+from typing import Callable, ContextManager, List, Dict, Generator, Optional
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocket
 
 from fastapi_ws_router import WSRouter
@@ -15,22 +16,22 @@ def app() -> FastAPI:
 
 
 @pytest.fixture(scope="function")
-def client(app: FastAPI) -> TestClient:
+def client(app: FastAPI) -> Generator[TestClient, None, None]:
     with TestClient(app) as client:
         yield client
 
 
-WebSocketFixture = Callable[..., ContextManager[WebSocket]]
+WebSocketFixture = Callable[..., ContextManager[WebSocketTestSession]]
 
 
 @pytest.fixture(scope="function")
-def ws(request, client: TestClient) -> WebSocketFixture:
+def ws(request, client: TestClient) -> Generator[WebSocketFixture, None, None]:
     @contextmanager
     def inner(
         path: str = "/ws",
-        subprotocols: List[str] = None,
-        headers: Dict[str, str] = None,
-    ):
+        subprotocols: Optional[List[str]] = None,
+        headers: Optional[Dict[str, str]] = None,
+    )-> Generator[WebSocketTestSession, None, None]:
         conn = client.websocket_connect(
             path,
             subprotocols=subprotocols,

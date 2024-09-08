@@ -31,7 +31,7 @@ class WSRouter(APIRouter):
         self,
         *,
         discriminator: Annotated[
-            str, Doc("The field name to use as a discriminator.")
+            Optional[str], Doc("The field name to use as a discriminator.")
         ] = None,
         prefix: Annotated[str, Doc("An optional path prefix for the router.")] = "",
         tags: Annotated[
@@ -137,9 +137,9 @@ class WSRouter(APIRouter):
                 """
             ),
         ] = True,
-        name: str = None,
-        callbacks: Any = None,
-        dispatcher: Callable[[WebSocket, Dict[type, Callable], str], Awaitable[None]] = None,
+        name: Optional[str] = None,
+        callbacks: Optional[type] = None,
+        dispatcher: Optional[Callable[[WebSocket, Dict[type, Callable], Union[str, bytes]], Awaitable[None]]] = None,
         as_text: bool = True,
     ) -> None:
         super().__init__(
@@ -154,7 +154,7 @@ class WSRouter(APIRouter):
             deprecated=deprecated,
             include_in_schema=include_in_schema,
         )
-        self._adapter = None
+        self._adapter: Optional[TypeAdapter[Any]] = None
         self.discriminator = discriminator
         self.dispatcher = dispatcher or self._dispatcher
         self.mapping: Dict[type, Callable] = {}
@@ -187,10 +187,10 @@ class WSRouter(APIRouter):
         if len(self.mapping) == 1:
             models = list(self.mapping.keys())[0]
         else:
-            models = GenericAlias(Union, tuple(self.mapping.keys()))
+            models = GenericAlias(Union, tuple(self.mapping.keys()))  # type: ignore[assignment, arg-type]
 
         if sys.version_info[1] > 10:
-            AnnotatedModels = Annotated[models, Field(discriminator=self.discriminator)]
+            AnnotatedModels = Annotated[models, Field(discriminator=self.discriminator)]  # type: ignore[valid-type]
             return TypeAdapter(AnnotatedModels)
         else:
             return TypeAdapter(models)
@@ -202,6 +202,7 @@ class WSRouter(APIRouter):
         await self._on_connect(websocket)
 
         try:
+            message: Union[str, bytes]
             if self.as_text:
                 message = await websocket.receive_text()
             else:
@@ -219,7 +220,7 @@ class WSRouter(APIRouter):
         self,
         websocket: WebSocket,
         mapping: Dict[type, Callable],
-        message: str,
+        message: Union[str, bytes],
     ):
         try:
             if not self._adapter:
@@ -249,7 +250,13 @@ class WSRouter(APIRouter):
         self._on_connect = func
         return func
 
-    def receive(self, model: Type[BaseModel], /, callbacks: Union[Type[BaseModel]] = None, path: str = None):
+    def receive(
+        self,
+                model: Type[BaseModel],
+                /,
+                callbacks: Optional[Union[Type[BaseModel], type]] = None,
+                path: Optional[str] = None,
+                ):
         def decorator(func):
             self.mapping[model] = func
             self.routes.append(
@@ -272,7 +279,7 @@ class WSRouter(APIRouter):
         self,
         websocket: WebSocket,
         message: Optional[Union[str, bytes]],
-        error: ValidationError,
+        error: Optional[Exception],
     ):
         """Handler to be called when the received message is not a valid model."""
         pass
