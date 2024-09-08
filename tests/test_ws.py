@@ -34,11 +34,11 @@ class PostMessage(BaseModel):
 )
 def test_app(router: WSRouter, ws: WebSocketFixture, model: str, body: dict):
     @router.receive(UserMessage)
-    async def get_user_message(message: UserMessage, websocket: WebSocket):
+    async def get_user_message(websocket: WebSocket, message: UserMessage):
         await websocket.send_json({"model": "UserMessage"})
 
     @router.receive(PostMessage, callbacks=Union[UserMessage, PostMessage])
-    async def get_post_message(message: PostMessage, websocket: WebSocket):
+    async def get_post_message(websocket: WebSocket, message: PostMessage):
         await websocket.send_json({"model": "PostMessage"})
 
     with ws() as client:
@@ -94,16 +94,6 @@ def test_fallback(router: WSRouter, ws: WebSocketFixture):
         data = websocket.receive_text()
         assert data == "Invalid message type"
 
-
-def test_fallback_bytes(router: WSRouter, ws: WebSocketFixture):
-    @router.on_bytes
-    async def fallback_bytes(websocket: WebSocket):
-        await websocket.send_text("Bytes fallback")
-
-    with ws() as websocket:
-        websocket.send_bytes(b"something")
-        data = websocket.receive_text()
-        assert data == "Bytes fallback"
 
 
 def test_empty_mapping(router: WSRouter, ws: WebSocketFixture):
@@ -181,10 +171,10 @@ def test_client_disconnect(router: WSRouter, ws: WebSocketFixture):
     disconnected = False
 
     @router.on_disconnect
-    async def on_disconnect(websocket: WebSocket, err: WebSocketDisconnect):
+    async def on_disconnect(websocket: WebSocket, code: int, reason: str):
         nonlocal disconnected
         disconnected = True
-        assert err.code == 1000
+        assert code == 1000
 
     with ws() as websocket:
         websocket.close()

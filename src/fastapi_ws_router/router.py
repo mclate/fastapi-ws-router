@@ -139,6 +139,7 @@ class WSRouter(APIRouter):
         name: str = None,
         callbacks: Any = None,
         dispatcher: Callable[[WebSocket, Dict[type, Callable], str], Awaitable[None]] = None,
+        as_text: bool = True,
     ) -> None:
         super().__init__(
             on_startup=on_startup,
@@ -156,6 +157,7 @@ class WSRouter(APIRouter):
         self.discriminator = discriminator
         self.dispatcher = dispatcher or self._dispatcher
         self.mapping: Dict[type, Callable] = {}
+        self.as_text = as_text
         # self.add_api_route(
         #     path="",
         #     route_class_override=WSRoute,
@@ -192,12 +194,12 @@ class WSRouter(APIRouter):
         await self._on_connect(websocket)
 
         try:
-            message = await websocket.receive_text()
+            if self.as_text:
+                message = await websocket.receive_text()
+            else:
+                message = await websocket.receive_bytes()
         except WebSocketDisconnect as err:
-            await self._on_disconnect(websocket, err)
-            return
-        except KeyError:  # didn't receive text
-            await self._on_bytes(websocket)
+            await self._on_disconnect(websocket, err.code, err.reason)
             return
         except RuntimeError as err:
             await self._fallback(websocket, None, err)
@@ -220,12 +222,10 @@ class WSRouter(APIRouter):
             await self._fallback(websocket, message, e)
             return
 
-        handler = self.mapping[validated.__class__]
-        await handler(validated, websocket)
+        handler = mapping[validated.__class__]
+        await handler(websocket, validated)
 
-    async def _on_disconnect(
-        self, websocket: WebSocket, err: WebSocketDisconnect
-    ) -> None:
+    async def _on_disconnect(self, websocket: WebSocket, code: int, message: Optional[str]) -> None:
         """Override to handle client disconnect"""
         pass
 
@@ -241,12 +241,12 @@ class WSRouter(APIRouter):
         self._on_connect = func
         return func
 
-    def receive(self, model: Type[BaseModel], callbacks: Union[Type[BaseModel]] = None):
+    def receive(self, model: Type[BaseModel], /, callbacks: Union[Type[BaseModel]] = None, path: str = None):
         def decorator(func):
             self.mapping[model] = func
             self.routes.append(
                 WSRoute(
-                    path=f" ({func.__name__})",
+                    path=path if path is not None else f" ({func.__name__})",
                     endpoint=func,
                     name=func.__name__,
                     methods=["POST"],
@@ -263,7 +263,7 @@ class WSRouter(APIRouter):
     async def _fallback(
         self,
         websocket: WebSocket,
-        message: str,
+        message: Optional[Union[str, bytes]],
         error: ValidationError,
     ):
         """Handler to be called when the received message is not a valid model."""
@@ -272,11 +272,3 @@ class WSRouter(APIRouter):
     def fallback(self, func):
         self._fallback = func
         return func
-
-    def on_bytes(self, func):
-        """Handler to be called when the received message is not a text (but bytes). Will call `fallback` by default."""
-        self._on_bytes = func
-        return func
-
-    async def _on_bytes(self, websocket: WebSocket):
-        pass
